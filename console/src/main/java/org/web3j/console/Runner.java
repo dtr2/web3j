@@ -25,7 +25,7 @@ public class Runner {
             + "                        |__/              \n";
 
     public static void main(String[] args) throws Exception {
-        System.out.println(LOGO);
+        if ( System.getenv("NOLOGO") == null ) System.out.println(LOGO);
 
         if (args.length < 1) {
             Console.exitError(USAGE);
