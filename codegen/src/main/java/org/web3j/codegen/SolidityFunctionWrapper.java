@@ -51,6 +51,7 @@ import org.web3j.protocol.core.DefaultBlockParameter;
 import org.web3j.protocol.core.RemoteCall;
 import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.response.AbiDefinition;
+import org.web3j.protocol.core.methods.response.BaseEventResponse;
 import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.tx.Contract;
@@ -244,6 +245,8 @@ public class SolidityFunctionWrapper extends Generator {
             List<AbiDefinition> functionDefinitions) throws ClassNotFoundException {
 
         List<MethodSpec> methodSpecs = new ArrayList<>();
+        List<String> eventNames = new ArrayList<>();
+
         boolean constructor = false;
 
         for (AbiDefinition functionDefinition : functionDefinitions) {
@@ -253,7 +256,7 @@ public class SolidityFunctionWrapper extends Generator {
 
             } else if (functionDefinition.getType().equals("event")) {
                 methodSpecs.addAll(buildEventFunctions(functionDefinition, classBuilder));
-
+                eventNames.add(buildEventDefinitionName(functionDefinition.getName()));
             } else if (functionDefinition.getType().equals("constructor")) {
                 constructor = true;
                 methodSpecs.add(buildDeploy(
@@ -263,6 +266,13 @@ public class SolidityFunctionWrapper extends Generator {
                         TRANSACTION_MANAGER));
             }
         }
+
+        classBuilder.addField(
+                FieldSpec.builder(new Event[0].getClass(),"ALL_EVENTS",
+                    Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL )
+                .initializer(CodeBlock.builder().addStatement(
+                        "new Event[]{"+eventNames.toString().replaceAll("[\\[\\]]", "")+"}").build())
+                .build());
 
         // constructor will not be specified in ABI file if its empty
         if (!constructor) {
@@ -740,7 +750,8 @@ public class SolidityFunctionWrapper extends Generator {
         TypeSpec.Builder builder = TypeSpec.classBuilder(className)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC);
 
-        builder.addField(LOG, "log", Modifier.PUBLIC);
+        builder.superclass(BaseEventResponse.class);
+
         for (org.web3j.codegen.SolidityFunctionWrapper.NamedTypeName
                 namedType : indexedParameters) {
             TypeName typeName = getIndexedEventWrapperType(namedType.typeName);
