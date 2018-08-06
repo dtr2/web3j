@@ -15,7 +15,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.lang.model.element.Modifier;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
@@ -29,6 +28,8 @@ import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.web3j.tx.RawTransactionManager;
+import org.web3j.tx.gas.StaticGasProvider;
 import rx.functions.Func1;
 
 import org.web3j.abi.EventEncoder;
@@ -56,6 +57,7 @@ import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.tx.Contract;
 import org.web3j.tx.TransactionManager;
+import org.web3j.tx.gas.ContractGasProvider;
 import org.web3j.utils.Collection;
 import org.web3j.utils.Strings;
 import org.web3j.utils.Version;
@@ -73,6 +75,7 @@ public class SolidityFunctionWrapper extends Generator {
     private static final String CONTRACT_ADDRESS = "contractAddress";
     private static final String GAS_PRICE = "gasPrice";
     private static final String GAS_LIMIT = "gasLimit";
+    private static final String GAS_PROVIDER = "gasProvider";
     private static final String FILTER = "filter";
     private static final String START_BLOCK = "startBlock";
     private static final String END_BLOCK = "endBlock";
@@ -126,6 +129,7 @@ public class SolidityFunctionWrapper extends Generator {
         classBuilder.addMethod(buildConstructor(Credentials.class, CREDENTIALS));
         classBuilder.addMethod(buildConstructor(TransactionManager.class,
                 TRANSACTION_MANAGER));
+        classBuilder.addMethod(buildConstructorWithGasProvider());
         classBuilder.addFields(buildFuncNameConstants(abi));
         classBuilder.addMethods(
                 buildFunctionDefinitions(className, classBuilder, abi));
@@ -326,6 +330,19 @@ public class SolidityFunctionWrapper extends Generator {
                         BINARY, CONTRACT_ADDRESS, WEB3J, authName, GAS_PRICE, GAS_LIMIT)
                 .build();
     }
+
+    private static MethodSpec buildConstructorWithGasProvider() {
+        return MethodSpec.constructorBuilder()
+                .addModifiers(Modifier.PROTECTED)
+                .addParameter(String.class, CONTRACT_ADDRESS)
+                .addParameter(Web3j.class, WEB3J)
+                .addParameter(TransactionManager.class, TRANSACTION_MANAGER)
+                .addParameter(ContractGasProvider.class, GAS_PROVIDER)
+                .addStatement("super($N, $N, $N, $N, $N)",
+                        BINARY, CONTRACT_ADDRESS, WEB3J, TRANSACTION_MANAGER, GAS_PROVIDER)
+                .build();
+    }
+
 
     private MethodSpec buildDeploy(
             String className, AbiDefinition functionDefinition,
