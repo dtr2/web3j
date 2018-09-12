@@ -28,6 +28,7 @@ import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.web3j.protocol.core.RemoteFunctionCall;
 import org.web3j.tx.RawTransactionManager;
 import org.web3j.tx.gas.StaticGasProvider;
 import rx.functions.Func1;
@@ -125,6 +126,9 @@ public class SolidityFunctionWrapper extends Generator {
         String className = Strings.capitaliseFirstLetter(contractName);
 
         TypeSpec.Builder classBuilder = createClassBuilder(className, bin);
+
+        classBuilder.addAnnotation(AnnotationSpec.builder(SuppressWarnings.class)
+                .addMember("value", "$L", "{\"unchecked\"}").build());
 
         classBuilder.addMethod(buildConstructor(Credentials.class, CREDENTIALS));
         classBuilder.addMethod(buildConstructor(TransactionManager.class,
@@ -652,7 +656,7 @@ public class SolidityFunctionWrapper extends Generator {
             } else {
                 nativeReturnTypeName = getWrapperType(typeName);
             }
-            methodBuilder.returns(buildRemoteCall(nativeReturnTypeName));
+            methodBuilder.returns(buildRemoteFunctionCall(nativeReturnTypeName));
 
             methodBuilder.addStatement("final $T function = "
                             + "new $T($N, \n$T.<$T>asList($L), "
@@ -690,15 +694,17 @@ public class SolidityFunctionWrapper extends Generator {
                                     .build())
                             .build();
 
-                    methodBuilder.addStatement("return new $T(\n$L)",
-                            buildRemoteCall(nativeReturnTypeName), callableType);
+                    methodBuilder.addStatement("return new $T(function,\n$L)",
+                            buildRemoteFunctionCall(nativeReturnTypeName), callableType);
                 } else {
                     methodBuilder.addStatement(
                             "return executeRemoteCallSingleValueReturn(function, $T.class)",
                             nativeReturnTypeName);
+
                 }
             } else {
                 methodBuilder.addStatement("return executeRemoteCallSingleValueReturn(function)");
+
             }
         } else {
             List<TypeName> returnTypes = buildReturnTypes(outputParameterTypes);
@@ -710,7 +716,7 @@ public class SolidityFunctionWrapper extends Generator {
                     returnTypes.toArray(
                             new TypeName[returnTypes.size()]));
 
-            methodBuilder.returns(buildRemoteCall(parameterizedTupleType));
+            methodBuilder.returns(buildRemoteFunctionCall(parameterizedTupleType));
 
             buildVariableLengthReturnFunctionConstructor(
                     methodBuilder, functionName, inputParams, outputParameterTypes);
@@ -722,6 +728,11 @@ public class SolidityFunctionWrapper extends Generator {
     private static ParameterizedTypeName buildRemoteCall(TypeName typeName) {
         return ParameterizedTypeName.get(
                 ClassName.get(RemoteCall.class), typeName);
+    }
+
+    private static ParameterizedTypeName buildRemoteFunctionCall(TypeName typeName) {
+        return ParameterizedTypeName.get(
+                ClassName.get(RemoteFunctionCall.class), typeName);
     }
 
     private void buildTransactionFunction(
@@ -744,7 +755,7 @@ public class SolidityFunctionWrapper extends Generator {
 
         String functionName = functionDefinition.getName();
 
-        methodBuilder.returns(buildRemoteCall(TypeName.get(TransactionReceipt.class)));
+        methodBuilder.returns(buildRemoteFunctionCall(TypeName.get(TransactionReceipt.class)));
 
         methodBuilder.addStatement("final $T function = new $T(\n$N, \n$T.<$T>asList($L), \n$T"
                         + ".<$T<?>>emptyList())",
@@ -1127,7 +1138,7 @@ public class SolidityFunctionWrapper extends Generator {
                 .build();
 
         methodBuilder.addStatement(
-                "return new $T(\n$L)", buildRemoteCall(tupleType), callableType);
+                "return new $T(function,\n$L)", buildRemoteFunctionCall(tupleType), callableType);
     }
 
     private static CodeBlock buildVariableLengthEventInitializer(
